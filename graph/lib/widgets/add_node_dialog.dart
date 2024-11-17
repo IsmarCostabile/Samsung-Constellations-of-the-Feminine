@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/node_data.dart';
 import 'dart:convert';
 import 'dart:html' as html;
+import '../widgets/info_card.dart'; // Add this import
 
 Widget _buildIconButton(IconData icon,
     VoidCallback onPressed,
     [Color? color]) {
   return Container(
-    margin: EdgeInsets.symmetric(
+    margin: const EdgeInsets.symmetric(
         horizontal: 5),
     decoration: BoxDecoration(
       color: color ?? Colors.grey[200],
@@ -26,6 +27,8 @@ Future<NodeData?> showAddNodeDialog(
   String title = '';
   String description = '';
   List<String> images = [];
+  String nodeType =
+      'default'; // Add this line
   final ValueNotifier<List<String>>
       imagesNotifier =
       ValueNotifier<List<String>>([]);
@@ -90,7 +93,7 @@ Future<NodeData?> showAddNodeDialog(
                 CrossAxisAlignment
                     .start,
             children: [
-              Text(
+              const Text(
                 'Add New Node ✨',
                 style: TextStyle(
                   fontSize: 32,
@@ -100,7 +103,8 @@ Future<NodeData?> showAddNodeDialog(
                       Color(0xFF14274E),
                 ),
               ),
-              SizedBox(height: 24),
+              const SizedBox(
+                  height: 24),
               Container(
                 decoration:
                     BoxDecoration(
@@ -109,7 +113,7 @@ Future<NodeData?> showAddNodeDialog(
                   borderRadius:
                       BorderRadius
                           .circular(12),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors
                           .black12,
@@ -137,8 +141,8 @@ Future<NodeData?> showAddNodeDialog(
                     fillColor: Colors
                         .grey[100],
                     contentPadding:
-                        EdgeInsets.all(
-                            16),
+                        const EdgeInsets
+                            .all(16),
                     labelStyle: TextStyle(
                         color: Colors
                             .grey[700]),
@@ -163,7 +167,8 @@ Future<NodeData?> showAddNodeDialog(
                           .grey[900]),
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(
+                  height: 16),
               Container(
                 decoration:
                     BoxDecoration(
@@ -172,7 +177,7 @@ Future<NodeData?> showAddNodeDialog(
                   borderRadius:
                       BorderRadius
                           .circular(12),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors
                           .black12,
@@ -201,8 +206,8 @@ Future<NodeData?> showAddNodeDialog(
                     fillColor: Colors
                         .grey[100],
                     contentPadding:
-                        EdgeInsets.all(
-                            16),
+                        const EdgeInsets
+                            .all(16),
                     labelStyle: TextStyle(
                         color: Colors
                             .grey[700]),
@@ -229,14 +234,16 @@ Future<NodeData?> showAddNodeDialog(
                           .grey[900]),
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(
+                  height: 16),
               ElevatedButton(
                 onPressed:
                     handleImageUpload,
                 style: ElevatedButton
                     .styleFrom(
                   backgroundColor:
-                      Color(0xFF14274E),
+                      const Color(
+                          0xFF14274E),
                   shape:
                       RoundedRectangleBorder(
                     borderRadius:
@@ -244,8 +251,9 @@ Future<NodeData?> showAddNodeDialog(
                             .circular(
                                 12),
                   ),
-                  padding: EdgeInsets
-                      .symmetric(
+                  padding:
+                      const EdgeInsets
+                          .symmetric(
                           horizontal:
                               24,
                           vertical: 12),
@@ -264,18 +272,20 @@ Future<NodeData?> showAddNodeDialog(
                 builder: (context,
                     imagesList, child) {
                   if (imagesList
-                      .isEmpty)
+                      .isEmpty) {
                     return const SizedBox
                         .shrink();
+                  }
                   return Container(
                     margin:
-                        EdgeInsets.only(
+                        const EdgeInsets
+                            .only(
                             top: 16),
                     height: 200,
                     child: GridView
                         .builder(
                       gridDelegate:
-                          SliverGridDelegateWithFixedCrossAxisCount(
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount:
                             3,
                         crossAxisSpacing:
@@ -296,7 +306,7 @@ Future<NodeData?> showAddNodeDialog(
                                   BoxDecoration(
                                 borderRadius:
                                     BorderRadius.circular(8),
-                                boxShadow: [
+                                boxShadow: const [
                                   BoxShadow(
                                     color:
                                         Colors.black12,
@@ -325,7 +335,7 @@ Future<NodeData?> showAddNodeDialog(
                               top: 4,
                               child:
                                   IconButton(
-                                icon: Icon(
+                                icon: const Icon(
                                     Icons
                                         .close,
                                     color:
@@ -346,7 +356,31 @@ Future<NodeData?> showAddNodeDialog(
                   );
                 },
               ),
-              SizedBox(height: 24),
+              const SizedBox(
+                  height: 16),
+              DropdownButton<String>(
+                value: nodeType,
+                onChanged:
+                    (String? newValue) {
+                  nodeType = newValue!;
+                },
+                items: <String>[
+                  'default',
+                  'root',
+                  'branch'
+                ].map<
+                    DropdownMenuItem<
+                        String>>((String
+                    value) {
+                  return DropdownMenuItem<
+                      String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(
+                  height: 24),
               Row(
                 mainAxisAlignment:
                     MainAxisAlignment
@@ -359,7 +393,8 @@ Future<NodeData?> showAddNodeDialog(
                         .pop(),
                     Colors.grey[200],
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(
+                      width: 10),
                   _buildIconButton(
                     Icons.check,
                     () {
@@ -375,6 +410,8 @@ Future<NodeData?> showAddNodeDialog(
                                 description,
                             images:
                                 images,
+                            type:
+                                nodeType, // Add this line
                           ),
                         );
                       }

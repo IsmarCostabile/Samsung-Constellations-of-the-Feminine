@@ -1,12 +1,14 @@
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart'; // Add this import
 
 class InfoCard extends StatefulWidget {
   final String title;
   final String description;
   final String? imageUrl;
   final bool isSelected;
+  final String type; // Add this line
 
   const InfoCard({
     super.key,
@@ -14,6 +16,7 @@ class InfoCard extends StatefulWidget {
     required this.description,
     this.imageUrl,
     this.isSelected = false,
+    required this.type, // Add this line
   });
 
   @override
@@ -115,72 +118,95 @@ class _InfoCardState
         size: 50, color: Colors.white);
   }
 
+  Widget _buildShimmerBackground(
+      Widget child) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius:
+              BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    Widget cardContent = Padding(
+      padding:
+          const EdgeInsets.all(8.0),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.grey,
+              borderRadius:
+                  BorderRadius.circular(
+                      8),
+            ),
+            child: ClipRRect(
+              borderRadius:
+                  BorderRadius.circular(
+                      8),
+              child: _buildImage(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+                Text(
+                  widget.title,
+                  style:
+                      const TextStyle(
+                    fontSize: 18,
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow
+                      .ellipsis,
+                ),
+                Text(
+                  widget.description,
+                  style:
+                      const TextStyle(
+                          fontSize: 14),
+                  overflow: TextOverflow
+                      .ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
     return Card(
       color: widget.isSelected
           ? const Color.fromARGB(
               255, 181, 255, 217)
           : Colors.white,
-      child: Padding(
-        padding:
-            const EdgeInsets.all(8.0),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.grey,
-                borderRadius:
-                    BorderRadius
-                        .circular(8),
-              ),
-              child: ClipRRect(
-                borderRadius:
-                    BorderRadius
-                        .circular(8),
-                child: _buildImage(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
-                mainAxisSize:
-                    MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.title,
-                    style:
-                        const TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                          FontWeight
-                              .bold,
-                    ),
-                    maxLines: 1,
-                    overflow:
-                        TextOverflow
-                            .ellipsis,
-                  ),
-                  Text(
-                    widget.description,
-                    style:
-                        const TextStyle(
-                            fontSize:
-                                14),
-                    overflow:
-                        TextOverflow
-                            .ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: Stack(
+        children: [
+          if (widget.type == 'root' ||
+              widget.type == 'branch')
+            Positioned.fill(
+                child:
+                    _buildShimmerBackground(
+                        Container())),
+          cardContent,
+        ],
       ),
     );
   }

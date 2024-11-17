@@ -16,6 +16,8 @@ class DraggableCanvas
       StreamController<
           NodeData?>.broadcast();
 
+  const DraggableCanvas({super.key});
+
   @override
   _DraggableCanvasState createState() =>
       _DraggableCanvasState();
@@ -27,6 +29,8 @@ class _DraggableCanvasState
 
   List<(Offset, NodeData)> nodes = [];
   List<List<int>> connections = [];
+  List<String> nodeTypes =
+      []; // Add this line
   Offset? dragStartOffset;
   Size canvasSize = Size.zero;
   bool isEraserEnabled = false;
@@ -42,8 +46,8 @@ class _DraggableCanvasState
   void initState() {
     super.initState();
     Timer.periodic(
-        Duration(milliseconds: 16),
-        (timer) {
+        const Duration(
+            milliseconds: 16), (timer) {
       _applyForces();
       _centerGraph();
     });
@@ -88,6 +92,8 @@ class _DraggableCanvasState
         ),
         data
       ));
+      nodeTypes.add(
+          data.type); // Add this line
     });
   }
 
@@ -116,12 +122,70 @@ class _DraggableCanvasState
     });
   }
 
-  void _removeNode(int index) {
+  Future<bool> _showDeleteConfirmation(
+      BuildContext context,
+      String type) async {
+    String itemType = type == 'node'
+        ? 'nodo'
+        : 'connessione';
+    return await showDialog(
+          context: context,
+          builder:
+              (BuildContext context) {
+            return AlertDialog(
+              title: Text(
+                  'Conferma l\'eliminazione'),
+              content: Text(
+                  'Sei sicuro/a di voler eliminare questo $itemType?'),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(
+                              context)
+                          .pop(false),
+                  child:
+                      Text('Annulla'),
+                  style: TextButton
+                      .styleFrom(
+                    foregroundColor:
+                        Colors
+                            .grey[600],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(
+                              context)
+                          .pop(true),
+                  child:
+                      Text('Elimina'),
+                  style: TextButton
+                      .styleFrom(
+                    foregroundColor:
+                        Colors.red,
+                  ),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  void _removeNode(int index) async {
+    bool confirmed =
+        await _showDeleteConfirmation(
+            context, 'node');
+    if (!confirmed) return;
+
     setState(() {
       nodes.removeAt(index);
+      nodeTypes.removeAt(index);
+
       connections.removeWhere(
           (connection) => connection
               .contains(index));
+
       for (var connection
           in connections) {
         if (connection[0] > index)
@@ -129,6 +193,24 @@ class _DraggableCanvasState
         if (connection[1] > index)
           connection[1]--;
       }
+
+      selectedNodeIndex = null;
+      DraggableCanvas
+          .selectedNodeController
+          .add(null);
+    });
+  }
+
+  void _removeConnection(
+      int index) async {
+    bool confirmed =
+        await _showDeleteConfirmation(
+            context, 'connection');
+    if (!confirmed) return;
+
+    setState(() {
+      connections.removeAt(index);
+      selectedConnection = null;
     });
   }
 
@@ -154,12 +236,6 @@ class _DraggableCanvasState
             [startIndex, endIndex]);
       });
     }
-  }
-
-  void _removeConnection(int index) {
-    setState(() {
-      connections.removeAt(index);
-    });
   }
 
   void _onScaleStart(
@@ -542,6 +618,7 @@ class _DraggableCanvasState
           width: 200,
           height: 75,
           child: InfoCard(
+            type: node.$2.type,
             title: node.$2.title,
             description:
                 node.$2.description,
@@ -617,14 +694,27 @@ class _DraggableCanvasState
 
   Widget _buildControlPanel() {
     return Positioned(
-      bottom: 15,
-      right: 15,
+      bottom:
+          20, // Changed from 15 to 20
+      right:
+          20, // Changed from 15 to 20
       child: Container(
-        padding: EdgeInsets.all(10),
+        padding:
+            const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius:
               BorderRadius.circular(15),
+          // Add shadow to match data section style
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black
+                  .withOpacity(0.15),
+              blurRadius: 12,
+              offset:
+                  const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize:
@@ -673,8 +763,9 @@ class _DraggableCanvasState
       VoidCallback onPressed,
       [Color? color]) {
     return Container(
-      margin: EdgeInsets.symmetric(
-          horizontal: 5),
+      margin:
+          const EdgeInsets.symmetric(
+              horizontal: 5),
       decoration: BoxDecoration(
         color:
             color ?? Colors.grey[200],
@@ -736,7 +827,8 @@ class _DraggableCanvasState
                 _onScaleUpdate,
             onScaleEnd: _onScaleEnd,
             child: Container(
-              color: Color(0xFF14274E),
+              color: const Color(
+                  0xFF14274E),
               child: Stack(
                 children: [
                   Transform(
@@ -749,12 +841,15 @@ class _DraggableCanvasState
                               .dy)
                       ..scale(scale),
                     child: CustomPaint(
-                      painter: CanvasPainter(
-                          nodes
-                              .map((node) =>
-                                  node.$1)
-                              .toList(),
-                          connections),
+                      painter:
+                          CanvasPainter(
+                        nodes
+                            .map((node) =>
+                                node.$1)
+                            .toList(),
+                        connections,
+                        nodeTypes, // Add this line
+                      ),
                       child:
                           Container(),
                     ),
@@ -780,7 +875,7 @@ class _DraggableCanvasState
                         index,
                         start,
                         end);
-                  }).toList(),
+                  }),
                   ...nodes
                       .asMap()
                       .entries
@@ -794,7 +889,7 @@ class _DraggableCanvasState
                         entry.value;
                     return _buildNode(
                         index, node);
-                  }).toList(),
+                  }),
                   _buildControlPanel(),
                 ],
               ),

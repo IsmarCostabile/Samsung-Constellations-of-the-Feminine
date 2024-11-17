@@ -4,9 +4,13 @@ class CanvasPainter
     extends CustomPainter {
   final List<Offset> nodes;
   final List<List<int>> connections;
+  final List<String>
+      nodeTypes; // Add this line
 
   CanvasPainter(
-      this.nodes, this.connections);
+      this.nodes,
+      this.connections,
+      this.nodeTypes); // Update constructor
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -39,6 +43,23 @@ class CanvasPainter
 
       canvas.drawLine(
           startPoint, endPoint, paint);
+    }
+
+    for (int i = 0;
+        i < nodes.length;
+        i++) {
+      final node = nodes[i];
+      final nodeType = nodeTypes[i];
+      final paint = Paint()
+        ..color = nodeType == 'root'
+            ? Colors.red
+            : nodeType == 'branch'
+                ? Colors.blue
+                : Colors.white
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(
+          node, 10.0, paint);
     }
   }
 
