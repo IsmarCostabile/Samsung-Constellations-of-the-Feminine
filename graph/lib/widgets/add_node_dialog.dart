@@ -4,20 +4,33 @@ import 'dart:convert';
 import 'dart:html' as html;
 import '../widgets/info_card.dart'; // Add this import
 
-Widget _buildIconButton(IconData icon,
+Widget _buildIconButton(
+    IconData icon,
+    String label,
     VoidCallback onPressed,
     [Color? color]) {
   return Container(
     margin: const EdgeInsets.symmetric(
-        horizontal: 5),
+        horizontal: 8),
     decoration: BoxDecoration(
       color: color ?? Colors.grey[200],
       borderRadius:
           BorderRadius.circular(15),
     ),
-    child: IconButton(
-      icon: Icon(icon),
-      onPressed: onPressed,
+    child: Padding(
+      padding: const EdgeInsets.only(
+          left: 8, right: 16),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(icon),
+            onPressed: onPressed,
+            padding: EdgeInsets.zero,
+          ),
+          Text(label),
+        ],
+      ),
     ),
   );
 }
@@ -27,8 +40,6 @@ Future<NodeData?> showAddNodeDialog(
   String title = '';
   String description = '';
   List<String> images = [];
-  String nodeType =
-      'default'; // Add this line
   final ValueNotifier<List<String>>
       imagesNotifier =
       ValueNotifier<List<String>>([]);
@@ -358,29 +369,6 @@ Future<NodeData?> showAddNodeDialog(
               ),
               const SizedBox(
                   height: 16),
-              DropdownButton<String>(
-                value: nodeType,
-                onChanged:
-                    (String? newValue) {
-                  nodeType = newValue!;
-                },
-                items: <String>[
-                  'default',
-                  'root',
-                  'branch'
-                ].map<
-                    DropdownMenuItem<
-                        String>>((String
-                    value) {
-                  return DropdownMenuItem<
-                      String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(
-                  height: 24),
               Row(
                 mainAxisAlignment:
                     MainAxisAlignment
@@ -388,6 +376,7 @@ Future<NodeData?> showAddNodeDialog(
                 children: [
                   _buildIconButton(
                     Icons.close,
+                    'Annulla',
                     () => Navigator.of(
                             context)
                         .pop(),
@@ -397,6 +386,7 @@ Future<NodeData?> showAddNodeDialog(
                       width: 10),
                   _buildIconButton(
                     Icons.check,
+                    'Aggiungi',
                     () {
                       if (title
                           .isNotEmpty) {
@@ -411,7 +401,7 @@ Future<NodeData?> showAddNodeDialog(
                             images:
                                 images,
                             type:
-                                nodeType, // Add this line
+                                'default', // Hardcode the type to 'default'
                           ),
                         );
                       }
