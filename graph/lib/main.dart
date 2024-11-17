@@ -15,11 +15,11 @@ class MyApp extends StatelessWidget {
         body: Row(
           children: [
             Expanded(
-              flex: 2,
+              flex: 3,
               child: DraggableCanvas(),
             ),
             Expanded(
-              flex: 1,
+              flex: 2,
               child: DataSection(),
             ),
           ],

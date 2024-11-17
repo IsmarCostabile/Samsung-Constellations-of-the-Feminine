@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math';
 import 'canvas_painter.dart';
-import 'info_card.dart';
+import 'widgets/info_card.dart';
+import 'models/node_data.dart';
+import 'widgets/add_node_dialog.dart';
+
+// Add these imports at the top
+import 'dart:async';
 
 class DraggableCanvas
     extends StatefulWidget {
+  static final selectedNodeController =
+      StreamController<
+          NodeData?>.broadcast();
+
   @override
   _DraggableCanvasState createState() =>
       _DraggableCanvasState();
@@ -13,7 +23,9 @@ class DraggableCanvas
 
 class _DraggableCanvasState
     extends State<DraggableCanvas> {
-  List<Offset> nodes = [];
+  // Remove the static selectedNodeController from here since it's moved to the widget class
+
+  List<(Offset, NodeData)> nodes = [];
   List<List<int>> connections = [];
   Offset? dragStartOffset;
   Size canvasSize = Size.zero;
@@ -37,18 +49,44 @@ class _DraggableCanvasState
     });
   }
 
-  void _addNode(Offset position) {
+  @override
+  void dispose() {
+    DraggableCanvas
+        .selectedNodeController
+        .close(); // Updated to use the widget's controller
+    super.dispose();
+  }
+
+  Future<void>
+      _showAddNodeDialog() async {
+    final nodeData =
+        await showAddNodeDialog(
+            context);
+    if (nodeData != null) {
+      _addNode(
+        Offset(canvasSize.width / 2,
+            canvasSize.height / 2),
+        nodeData,
+      );
+    }
+  }
+
+  void _addNode(
+      Offset position, NodeData data) {
     final random = Random();
     setState(() {
-      nodes.add(Offset(
-        position.dx +
-            (random.nextDouble() -
-                    0.5) *
-                10,
-        position.dy +
-            (random.nextDouble() -
-                    0.5) *
-                10,
+      nodes.add((
+        Offset(
+          position.dx +
+              (random.nextDouble() -
+                      0.5) *
+                  10,
+          position.dy +
+              (random.nextDouble() -
+                      0.5) *
+                  10,
+        ),
+        data
       ));
     });
   }
@@ -57,15 +95,18 @@ class _DraggableCanvasState
       int index, Offset startPosition) {
     setState(() {
       dragStartOffset =
-          nodes[index] - startPosition;
+          nodes[index].$1 -
+              startPosition;
     });
   }
 
   void _updateNodePosition(
       int index, Offset newPosition) {
     setState(() {
-      nodes[index] = newPosition +
-          dragStartOffset!;
+      nodes[index] = (
+        newPosition + dragStartOffset!,
+        nodes[index].$2
+      );
     });
   }
 
@@ -91,9 +132,23 @@ class _DraggableCanvasState
     });
   }
 
+  bool _areNodesConnected(
+      int node1, int node2) {
+    return connections.any(
+        (connection) =>
+            (connection[0] == node1 &&
+                connection[1] ==
+                    node2) ||
+            (connection[0] == node2 &&
+                connection[1] ==
+                    node1));
+  }
+
   void _addConnection(
       int startIndex, int endIndex) {
-    if (startIndex != endIndex) {
+    if (startIndex != endIndex &&
+        !_areNodesConnected(
+            startIndex, endIndex)) {
       setState(() {
         connections.add(
             [startIndex, endIndex]);
@@ -153,7 +208,7 @@ class _DraggableCanvasState
           j < nodes.length;
           j++) {
         Offset direction =
-            nodes[i] - nodes[j];
+            nodes[i].$1 - nodes[j].$1;
         double distance =
             direction.distance - 100;
         if (distance < minDistance) {
@@ -174,7 +229,10 @@ class _DraggableCanvasState
       for (int i = 0;
           i < nodes.length;
           i++) {
-        nodes[i] += forces[i];
+        nodes[i] = (
+          nodes[i].$1 + forces[i],
+          nodes[i].$2
+        );
       }
     });
   }
@@ -188,8 +246,8 @@ class _DraggableCanvasState
       int startIndex = connection[0];
       int endIndex = connection[1];
       Offset direction =
-          nodes[endIndex] -
-              nodes[startIndex];
+          nodes[endIndex].$1 -
+              nodes[startIndex].$1;
       double distance =
           direction.distance - 100;
       if (distance > 0) {
@@ -198,9 +256,16 @@ class _DraggableCanvasState
             attractionStrength *
             distance;
         setState(() {
-          nodes[startIndex] +=
-              attraction;
-          nodes[endIndex] -= attraction;
+          nodes[startIndex] = (
+            nodes[startIndex].$1 +
+                attraction,
+            nodes[startIndex].$2
+          );
+          nodes[endIndex] = (
+            nodes[endIndex].$1 -
+                attraction,
+            nodes[endIndex].$2
+          );
         });
       }
     }
@@ -212,10 +277,12 @@ class _DraggableCanvasState
       for (int i = 0;
           i < nodes.length;
           i++) {
-        nodes[i] =
-            nodes[i] * dampingFactor +
-                nodes[i] *
-                    (1 - dampingFactor);
+        nodes[i] = (
+          nodes[i].$1 * dampingFactor +
+              nodes[i].$1 *
+                  (1 - dampingFactor),
+          nodes[i].$2
+        );
       }
     });
   }
@@ -236,10 +303,14 @@ class _DraggableCanvasState
         var connection2 =
             connections[j];
 
-        var p1 = nodes[connection1[0]];
-        var p2 = nodes[connection1[1]];
-        var p3 = nodes[connection2[0]];
-        var p4 = nodes[connection2[1]];
+        var p1 =
+            nodes[connection1[0]].$1;
+        var p2 =
+            nodes[connection1[1]].$1;
+        var p3 =
+            nodes[connection2[0]].$1;
+        var p4 =
+            nodes[connection2[1]].$1;
 
         if (_doEdgesIntersect(
             p1, p2, p3, p4)) {
@@ -255,14 +326,30 @@ class _DraggableCanvasState
                 distance *
                 edgeCrossingReductionStrength;
             setState(() {
-              nodes[connection1[0]] -=
-                  displacement;
-              nodes[connection1[1]] +=
-                  displacement;
-              nodes[connection2[0]] +=
-                  displacement;
-              nodes[connection2[1]] -=
-                  displacement;
+              nodes[connection1[0]] = (
+                nodes[connection1[0]]
+                        .$1 -
+                    displacement,
+                nodes[connection1[0]].$2
+              );
+              nodes[connection1[1]] = (
+                nodes[connection1[1]]
+                        .$1 +
+                    displacement,
+                nodes[connection1[1]].$2
+              );
+              nodes[connection2[0]] = (
+                nodes[connection2[0]]
+                        .$1 +
+                    displacement,
+                nodes[connection2[0]].$2
+              );
+              nodes[connection2[1]] = (
+                nodes[connection2[1]]
+                        .$1 -
+                    displacement,
+                nodes[connection2[1]].$2
+              );
             });
           }
         }
@@ -299,15 +386,18 @@ class _DraggableCanvasState
     final random = Random();
     setState(() {
       nodes = nodes.map((node) {
-        return Offset(
-          canvasSize.width / 2 +
-              (random.nextDouble() -
-                      0.5) *
-                  10,
-          canvasSize.height / 2 +
-              (random.nextDouble() -
-                      0.5) *
-                  10,
+        return (
+          Offset(
+            canvasSize.width / 2 +
+                (random.nextDouble() -
+                        0.5) *
+                    10,
+            canvasSize.height / 2 +
+                (random.nextDouble() -
+                        0.5) *
+                    10,
+          ),
+          node.$2
         );
       }).toList();
     });
@@ -317,16 +407,16 @@ class _DraggableCanvasState
     if (nodes.isEmpty) return;
 
     double minX = nodes
-        .map((node) => node.dx)
+        .map((node) => node.$1.dx)
         .reduce(min);
     double maxX = nodes
-        .map((node) => node.dx)
+        .map((node) => node.$1.dx)
         .reduce(max);
     double minY = nodes
-        .map((node) => node.dy)
+        .map((node) => node.$1.dy)
         .reduce(min);
     double maxY = nodes
-        .map((node) => node.dy)
+        .map((node) => node.$1.dy)
         .reduce(max);
 
     double graphWidth = maxX - minX;
@@ -347,16 +437,16 @@ class _DraggableCanvasState
     if (nodes.isEmpty) return;
 
     double minX = nodes
-        .map((node) => node.dx)
+        .map((node) => node.$1.dx)
         .reduce(min);
     double maxX = nodes
-        .map((node) => node.dx)
+        .map((node) => node.$1.dx)
         .reduce(max);
     double minY = nodes
-        .map((node) => node.dy)
+        .map((node) => node.$1.dy)
         .reduce(min);
     double maxY = nodes
-        .map((node) => node.dy)
+        .map((node) => node.$1.dy)
         .reduce(max);
 
     double graphWidth = maxX - minX;
@@ -380,41 +470,54 @@ class _DraggableCanvasState
   void _onCanvasTap() {
     setState(() {
       selectedNodeIndex = null;
-      selectedConnection =
-          null; // Deselect edges
+      selectedConnection = null;
+      DraggableCanvas
+          .selectedNodeController
+          .add(null); // Add this line
     });
   }
 
-  Widget _buildNode(
-      int index, Offset position) {
+  Widget _buildNode(int index,
+      (Offset, NodeData) node) {
     return Positioned(
-      left: (position.dx * scale +
+      left: (node.$1.dx * scale +
               canvasOffset.dx) -
           100,
-      top: (position.dy * scale +
+      top: (node.$1.dy * scale +
               canvasOffset.dy) -
           37.5,
       child: GestureDetector(
         onTap: () {
+          setState(() {
+            selectedConnection =
+                null; // Clear selected edge when a node is clicked
+          });
+
           if (isEraserEnabled) {
             _removeNode(index);
           } else {
             if (selectedNodeIndex ==
                 null) {
               selectedNodeIndex = index;
-              if (!isPlaying) {
-                print(
-                    'Node $index: $position');
-              }
+              DraggableCanvas
+                  .selectedNodeController
+                  .add(node
+                      .$2); // Updated to use the widget's controller
             } else if (!isPlaying) {
               selectedNodeIndex = index;
-              print(
-                  'Node $index: $position');
+              DraggableCanvas
+                  .selectedNodeController
+                  .add(node
+                      .$2); // Updated to use the widget's controller
             } else {
               _addConnection(
                   selectedNodeIndex!,
                   index);
-              selectedNodeIndex = null;
+              // Update these lines to select the second node after connection
+              selectedNodeIndex = index;
+              DraggableCanvas
+                  .selectedNodeController
+                  .add(node.$2);
             }
           }
         },
@@ -439,8 +542,13 @@ class _DraggableCanvasState
           width: 200,
           height: 75,
           child: InfoCard(
-            title: 'title',
-            description: 'description',
+            title: node.$2.title,
+            description:
+                node.$2.description,
+            imageUrl: node.$2.images
+                    .isNotEmpty
+                ? node.$2.images[0]
+                : null, // Fix: remove nodeData reference
             isSelected:
                 selectedNodeIndex ==
                     index,
@@ -476,6 +584,8 @@ class _DraggableCanvasState
               setState(() {
                 selectedConnection =
                     index;
+                selectedNodeIndex =
+                    null; // Clear selected node when edge is clicked
               });
             }
           },
@@ -546,13 +656,10 @@ class _DraggableCanvasState
                   ? Colors.red[200]
                   : Colors.grey[200],
             ),
-            _buildIconButton(Icons.add,
-                () {
-              _addNode(Offset(
-                  canvasSize.width / 2,
-                  canvasSize.height /
-                      2));
-            }),
+            _buildIconButton(
+              Icons.add,
+              _showAddNodeDialog,
+            ),
             _buildIconButton(
                 Icons.shuffle,
                 _randomizeNodePositions),
@@ -572,7 +679,7 @@ class _DraggableCanvasState
         color:
             color ?? Colors.grey[200],
         borderRadius:
-            BorderRadius.circular(10),
+            BorderRadius.circular(15),
       ),
       child: IconButton(
         icon: Icon(icon),
@@ -588,60 +695,109 @@ class _DraggableCanvasState
         canvasSize = Size(
             constraints.maxWidth,
             constraints.maxHeight);
-        return GestureDetector(
-          onTap: _onCanvasTap,
-          onScaleStart: _onScaleStart,
-          onScaleUpdate: _onScaleUpdate,
-          onScaleEnd: _onScaleEnd,
-          child: Container(
-            color: Color(0xFF14274E),
-            child: Stack(
-              children: [
-                Transform(
-                  transform:
-                      Matrix4.identity()
-                        ..translate(
-                            canvasOffset
-                                .dx,
-                            canvasOffset
-                                .dy)
-                        ..scale(scale),
-                  child: CustomPaint(
-                    painter:
-                        CanvasPainter(
-                            nodes,
-                            connections),
-                    child: Container(),
+        return Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event.logicalKey ==
+                    LogicalKeyboardKey
+                        .delete ||
+                event.logicalKey ==
+                    LogicalKeyboardKey
+                        .backspace) {
+              if (selectedNodeIndex !=
+                  null) {
+                _removeNode(
+                    selectedNodeIndex!);
+                setState(() {
+                  selectedNodeIndex =
+                      null;
+                });
+                return KeyEventResult
+                    .handled;
+              } else if (selectedConnection !=
+                  null) {
+                _removeConnection(
+                    selectedConnection!);
+                setState(() {
+                  selectedConnection =
+                      null;
+                });
+                return KeyEventResult
+                    .handled;
+              }
+            }
+            return KeyEventResult
+                .ignored;
+          },
+          child: GestureDetector(
+            onTap: _onCanvasTap,
+            onScaleStart: _onScaleStart,
+            onScaleUpdate:
+                _onScaleUpdate,
+            onScaleEnd: _onScaleEnd,
+            child: Container(
+              color: Color(0xFF14274E),
+              child: Stack(
+                children: [
+                  Transform(
+                    transform: Matrix4
+                        .identity()
+                      ..translate(
+                          canvasOffset
+                              .dx,
+                          canvasOffset
+                              .dy)
+                      ..scale(scale),
+                    child: CustomPaint(
+                      painter: CanvasPainter(
+                          nodes
+                              .map((node) =>
+                                  node.$1)
+                              .toList(),
+                          connections),
+                      child:
+                          Container(),
+                    ),
                   ),
-                ),
-                ...connections
-                    .asMap()
-                    .entries
-                    .map((entry) {
-                  int index = entry.key;
-                  List<int> connection =
-                      entry.value;
-                  Offset start = nodes[
-                      connection[0]];
-                  Offset end = nodes[
-                      connection[1]];
-                  return _buildEdgeContainer(
-                      index,
-                      start,
-                      end);
-                }).toList(),
-                ...nodes
-                    .asMap()
-                    .entries
-                    .map((entry) {
-                  int index = entry.key;
-                  Offset position =
-                      entry.value;
-                  return _buildNode(
-                      index, position);
-                }).toList(),
-                _buildControlPanel(),
-              ],
+                  ...connections
+                      .asMap()
+                      .entries
+                      .map((entry) {
+                    int index =
+                        entry.key;
+                    List<int>
+                        connection =
+                        entry.value;
+                    Offset start = nodes[
+                            connection[
+                                0]]
+                        .$1;
+                    Offset end = nodes[
+                            connection[
+                                1]]
+                        .$1;
+                    return _buildEdgeContainer(
+                        index,
+                        start,
+                        end);
+                  }).toList(),
+                  ...nodes
+                      .asMap()
+                      .entries
+                      .map((entry) {
+                    int index =
+                        entry.key;
+                    (
+                      Offset,
+                      NodeData
+                    ) node =
+                        entry.value;
+                    return _buildNode(
+                        index, node);
+                  }).toList(),
+                  _buildControlPanel(),
+                ],
+              ),
             ),
           ),
         );
