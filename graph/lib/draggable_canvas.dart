@@ -24,7 +24,7 @@ class _DraggableCanvasState
   Offset canvasOffset = Offset.zero;
   Offset? lastFocalPoint;
   bool isPlaying = true;
-  List<int>? selectedConnection;
+  int? selectedConnection;
 
   @override
   void initState() {
@@ -380,6 +380,8 @@ class _DraggableCanvasState
   void _onCanvasTap() {
     setState(() {
       selectedNodeIndex = null;
+      selectedConnection =
+          null; // Deselect edges
     });
   }
 
@@ -442,6 +444,61 @@ class _DraggableCanvasState
             isSelected:
                 selectedNodeIndex ==
                     index,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEdgeContainer(int index,
+      Offset start, Offset end) {
+    Offset midPoint = (start + end) / 2;
+    double angle = atan2(
+        end.dy - start.dy,
+        end.dx - start.dx);
+    double distance =
+        (start - end).distance;
+
+    return Positioned(
+      left: (midPoint.dx * scale +
+              canvasOffset.dx) -
+          distance / 2,
+      top: (midPoint.dy * scale +
+              canvasOffset.dy) -
+          12.5, // Adjust height
+      child: Transform.rotate(
+        angle: angle,
+        child: GestureDetector(
+          onTap: () {
+            if (isEraserEnabled) {
+              _removeConnection(index);
+            } else {
+              setState(() {
+                selectedConnection =
+                    index;
+              });
+            }
+          },
+          child: Container(
+            width: distance,
+            height: 25, // Adjust height
+            color: Colors
+                .transparent, // Make hit boxes invisible
+            child: Center(
+              child:
+                  selectedConnection ==
+                          index
+                      ? Container(
+                          width:
+                              distance,
+                          height:
+                              5, // Adjust height for highlight
+                          color: Colors
+                                  .green[
+                              200],
+                        )
+                      : null,
+            ),
           ),
         ),
       ),
@@ -557,6 +614,22 @@ class _DraggableCanvasState
                     child: Container(),
                   ),
                 ),
+                ...connections
+                    .asMap()
+                    .entries
+                    .map((entry) {
+                  int index = entry.key;
+                  List<int> connection =
+                      entry.value;
+                  Offset start = nodes[
+                      connection[0]];
+                  Offset end = nodes[
+                      connection[1]];
+                  return _buildEdgeContainer(
+                      index,
+                      start,
+                      end);
+                }).toList(),
                 ...nodes
                     .asMap()
                     .entries
