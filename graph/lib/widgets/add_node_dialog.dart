@@ -32,10 +32,11 @@ Future<NodeData?> showAddNodeDialog(
 
   Future<void>
       handleImageUpload() async {
-    final input =
-        html.FileUploadInputElement()
-          ..accept = 'image/*'
-          ..multiple = false;
+    final input = html
+        .FileUploadInputElement()
+      ..accept = 'image/*'
+      ..multiple =
+          true; // Enable multiple file selection
 
     input.click();
 
@@ -44,19 +45,20 @@ Future<NodeData?> showAddNodeDialog(
 
     if (input.files?.isNotEmpty ??
         false) {
-      final file = input.files![0];
-      final reader = html.FileReader();
-      reader.readAsDataUrl(file);
+      for (var file in input.files!) {
+        final reader =
+            html.FileReader();
+        reader.readAsDataUrl(file);
+        await reader.onLoad.first;
 
-      await reader.onLoad
-          .first; // Wait for load completion
-
-      final base64Image =
-          reader.result as String;
-      images = [base64Image];
-      imagesNotifier.value = images;
+        final base64Image =
+            reader.result as String;
+        images.add(base64Image);
+      }
+      imagesNotifier.value = List.from(
+          images); // Create new list to trigger update
       print(
-          'Image loaded, length: ${base64Image.length}'); // Debug print
+          'Images loaded, count: ${images.length}');
     }
   }
 
@@ -269,46 +271,77 @@ Future<NodeData?> showAddNodeDialog(
                     margin:
                         EdgeInsets.only(
                             top: 16),
-                    padding:
-                        EdgeInsets.all(
-                            8),
-                    decoration:
-                        BoxDecoration(
-                      color: Colors
-                          .grey[100],
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                                  12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors
-                              .black12,
-                          blurRadius: 4,
-                          offset:
-                              Offset(
-                                  0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                                  8),
-                      child:
-                          Image.memory(
-                        base64Decode(
-                            imagesList[
-                                    0]
-                                .split(
-                                    ',')[1]),
-                        height: 200,
-                        width: double
-                            .infinity,
-                        fit: BoxFit
-                            .cover,
+                    height: 200,
+                    child: GridView
+                        .builder(
+                      gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount:
+                            3,
+                        crossAxisSpacing:
+                            8,
+                        mainAxisSpacing:
+                            8,
                       ),
+                      itemCount:
+                          imagesList
+                              .length,
+                      itemBuilder:
+                          (context,
+                              index) {
+                        return Stack(
+                          children: [
+                            Container(
+                              decoration:
+                                  BoxDecoration(
+                                borderRadius:
+                                    BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        Colors.black12,
+                                    blurRadius:
+                                        4,
+                                    offset:
+                                        Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child:
+                                  ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(8),
+                                child: Image
+                                    .memory(
+                                  base64Decode(
+                                      imagesList[index].split(',')[1]),
+                                  fit: BoxFit
+                                      .cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              right: 4,
+                              top: 4,
+                              child:
+                                  IconButton(
+                                icon: Icon(
+                                    Icons
+                                        .close,
+                                    color:
+                                        Colors.white),
+                                onPressed:
+                                    () {
+                                  images
+                                      .removeAt(index);
+                                  imagesNotifier.value =
+                                      List.from(images);
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   );
                 },
