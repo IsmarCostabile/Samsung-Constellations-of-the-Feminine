@@ -195,16 +195,58 @@ class _InfoCardState
     return Card(
       color: widget.isSelected
           ? const Color.fromARGB(
-              255, 181, 255, 217)
-          : Colors.white,
+              255,
+              181,
+              255,
+              217) // Selected nodes are always green
+          : widget.type == 'parent'
+              ? Colors.blue[
+                  100] // Non-selected parent nodes are blue
+              : widget.type ==
+                      'super-node'
+                  ? Colors.yellow[
+                      100] // Non-selected super nodes are yellow
+                  : Colors
+                      .white, // Normal nodes are white
       child: Stack(
         children: [
-          if (widget.type == 'root' ||
-              widget.type == 'branch')
+          if (widget.type ==
+              'super-node')
             Positioned.fill(
-                child:
-                    _buildShimmerBackground(
-                        Container())),
+              child:
+                  _buildShimmerBackground(
+                      Container()),
+            ),
+          // Add blue overlay for parent nodes when selected
+          if (widget.type == 'parent' &&
+              widget.isSelected)
+            Positioned.fill(
+              child: Container(
+                decoration:
+                    BoxDecoration(
+                  color:
+                      Colors.blue[100],
+                  borderRadius:
+                      BorderRadius
+                          .circular(8),
+                ),
+              ),
+            ),
+          if (widget.isSelected)
+            Positioned.fill(
+              child: Container(
+                decoration:
+                    BoxDecoration(
+                  color: const Color
+                          .fromARGB(255,
+                          181, 255, 217)
+                      .withOpacity(0.5),
+                  borderRadius:
+                      BorderRadius
+                          .circular(8),
+                ),
+              ),
+            ),
           cardContent,
         ],
       ),

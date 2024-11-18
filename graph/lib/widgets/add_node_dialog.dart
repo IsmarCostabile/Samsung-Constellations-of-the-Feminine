@@ -40,6 +40,7 @@ Future<NodeData?> showAddNodeDialog(
   String title = '';
   String description = '';
   List<String> images = [];
+  String type = 'normal'; // Add this line at the start of showAddNodeDialog function
   final ValueNotifier<List<String>>
       imagesNotifier =
       ValueNotifier<List<String>>([]);
@@ -247,6 +248,38 @@ Future<NodeData?> showAddNodeDialog(
               ),
               const SizedBox(
                   height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: type,
+                  decoration: InputDecoration(
+                    labelText: 'Type',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                    DropdownMenuItem(value: 'super-node', child: Text('Super Node')),
+                  ],
+                  onChanged: (value) => type = value!,
+                ),
+              ),
+              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed:
                     handleImageUpload,
@@ -400,8 +433,7 @@ Future<NodeData?> showAddNodeDialog(
                                 description,
                             images:
                                 images,
-                            type:
-                                'default', // Hardcode the type to 'default'
+                            type: type,  // Update this line
                           ),
                         );
                       }

@@ -4,35 +4,49 @@ class CanvasPainter
     extends CustomPainter {
   final List<Offset> nodes;
   final List<List<int>> connections;
-  final List<String>
-      nodeTypes; // Add this line
+  final List<String> nodeTypes;
 
-  CanvasPainter(
-      this.nodes,
-      this.connections,
-      this.nodeTypes); // Update constructor
+  CanvasPainter(this.nodes,
+      this.connections, this.nodeTypes);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.0;
+    // Draw connections first (so they appear behind nodes)
+    final connectionPaint = Paint()
+      ..color =
+          Colors.white.withOpacity(0.5)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
 
+    // Draw all connections with validation
     for (var connection
         in connections) {
+      // Skip invalid connections
+      if (connection.length != 2 ||
+          connection[0] >=
+              nodes.length ||
+          connection[1] >=
+              nodes.length ||
+          connection[0] < 0 ||
+          connection[1] < 0) {
+        continue;
+      }
+
       final startNode =
           nodes[connection[0]];
       final endNode =
           nodes[connection[1]];
 
       final startRect = Rect.fromCenter(
-          center: startNode,
-          width: 200,
-          height: 75);
+        center: startNode,
+        width: 200,
+        height: 75,
+      );
       final endRect = Rect.fromCenter(
-          center: endNode,
-          width: 200,
-          height: 75);
+        center: endNode,
+        width: 200,
+        height: 75,
+      );
 
       final startPoint =
           _getEdgeIntersection(
@@ -41,25 +55,31 @@ class CanvasPainter
           _getEdgeIntersection(
               endRect, startNode);
 
-      canvas.drawLine(
-          startPoint, endPoint, paint);
+      canvas.drawLine(startPoint,
+          endPoint, connectionPaint);
     }
+
+    // Draw nodes (dots) on top of connections
+    final nodePaint = Paint()
+      ..style = PaintingStyle.fill;
 
     for (int i = 0;
         i < nodes.length;
         i++) {
-      final node = nodes[i];
-      final nodeType = nodeTypes[i];
-      final paint = Paint()
-        ..color = nodeType == 'root'
-            ? Colors.red
-            : nodeType == 'branch'
-                ? Colors.blue
-                : Colors.white
-        ..style = PaintingStyle.fill;
-
+      switch (nodeTypes[i]) {
+        case 'super-node':
+          nodePaint.color =
+              Colors.yellow;
+          break;
+        case 'parent':
+          nodePaint.color = Colors.blue;
+          break;
+        default:
+          nodePaint.color =
+              Colors.white;
+      }
       canvas.drawCircle(
-          node, 10.0, paint);
+          nodes[i], 5.0, nodePaint);
     }
   }
 

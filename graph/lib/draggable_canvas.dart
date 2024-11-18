@@ -15,6 +15,10 @@ class DraggableCanvas
   static final selectedNodeController =
       StreamController<
           NodeData?>.broadcast();
+  // Add navigation controller
+  static final navigationController =
+      StreamController<
+          String>.broadcast();
 
   const DraggableCanvas({super.key});
 
@@ -41,6 +45,15 @@ class _DraggableCanvasState
   Offset? lastFocalPoint;
   bool isPlaying = true;
   int? selectedConnection;
+
+  // Add navigation stack to track graph hierarchy
+  final List<
+      ({
+        List<(Offset, NodeData)> nodes,
+        List<List<int>> connections,
+        NodeData superNode,
+      })> _navigationStack = [];
+  NodeData? _currentSuperNode;
 
   @override
   void initState() {
@@ -173,6 +186,12 @@ class _DraggableCanvasState
   }
 
   void _removeNode(int index) async {
+    // Prevent deletion of parent node in sub-graphs
+    if (_navigationStack.isNotEmpty &&
+        index == 0) {
+      return;
+    }
+
     bool confirmed =
         await _showDeleteConfirmation(
             context, 'node');
@@ -182,6 +201,7 @@ class _DraggableCanvasState
       nodes.removeAt(index);
       nodeTypes.removeAt(index);
 
+      // Update connections, accounting for parent node
       connections.removeWhere(
           (connection) => connection
               .contains(index));
@@ -201,17 +221,22 @@ class _DraggableCanvasState
     });
   }
 
-  void _removeConnection(
-      int index) async {
-    bool confirmed =
-        await _showDeleteConfirmation(
-            context, 'connection');
-    if (!confirmed) return;
-
-    setState(() {
-      connections.removeAt(index);
-      selectedConnection = null;
-    });
+  void _removeConnection(int index) {
+    if (index < connections.length) {
+      final startNode =
+          nodes[connections[index][0]]
+              .$2;
+      final endNode =
+          nodes[connections[index][1]]
+              .$2;
+      setState(() {
+        startNode.removeConnection(
+            endNode.id);
+        endNode.removeConnection(
+            startNode.id);
+        connections.removeAt(index);
+      });
+    }
   }
 
   bool _areNodesConnected(
@@ -228,13 +253,23 @@ class _DraggableCanvasState
 
   void _addConnection(
       int startIndex, int endIndex) {
-    if (startIndex != endIndex &&
-        !_areNodesConnected(
-            startIndex, endIndex)) {
-      setState(() {
-        connections.add(
-            [startIndex, endIndex]);
-      });
+    if (startIndex != endIndex) {
+      final startNode =
+          nodes[startIndex].$2;
+      final endNode =
+          nodes[endIndex].$2;
+
+      if (!startNode
+          .hasConnection(endNode.id)) {
+        setState(() {
+          startNode.addConnection(
+              endNode.id);
+          endNode.addConnection(
+              startNode.id);
+          connections.add(
+              [startIndex, endIndex]);
+        });
+      }
     }
   }
 
@@ -553,8 +588,113 @@ class _DraggableCanvasState
     });
   }
 
+  void _navigateToSubGraph(NodeData superNode) {
+    if (superNode.type != 'super-node') return;
+
+    // Save current state to navigation stack
+    if (_currentSuperNode != null) {
+      // Update current super node's children before navigating
+      _currentSuperNode!.clearChildren(); // Clear existing children
+      for (var node in nodes.sublist(1)) { // Skip parent node
+        node.$2.position = node.$1; // Save position
+        _currentSuperNode!.addChild(node.$2);
+      }
+    }
+
+    setState(() {
+      _navigationStack.add((
+        nodes: List.from(nodes),
+        connections: List.from(connections),
+        superNode: superNode,
+      ));
+
+      // Create or reuse parent node
+      final parentNode = superNode.children.values
+          .where((n) => n.type == 'parent')
+          .firstOrNull ?? 
+        NodeData(
+          title: superNode.title,
+          description: 'Parent Node',
+          type: 'parent',
+          images: superNode.images,
+          parent: superNode,
+        );
+
+      nodes = [(
+        Offset(canvasSize.width / 2, canvasSize.height / 2),
+        parentNode
+      )];
+
+      // Add child nodes and maintain their connections with parent
+      nodes.addAll(
+        superNode.children.values
+          .where((node) => node.type != 'parent')
+          .map((child) {
+            // Create connection between parent and child
+            parentNode.addConnection(child.id);
+            child.addConnection(parentNode.id);
+            return (child.position, child);
+          })
+      );
+
+      // Rebuild all connections
+      connections = [];
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = i + 1; j < nodes.length; j++) {
+          if (nodes[i].$2.hasConnection(nodes[j].$2.id)) {
+            connections.add([i, j]);
+          }
+        }
+      }
+
+      nodeTypes = nodes.map((node) => node.$2.type).toList();
+      _currentSuperNode = superNode;
+    });
+
+    DraggableCanvas.navigationController.add(superNode.title);
+  }
+
+  void _navigateBack() {
+    if (_navigationStack.isEmpty) return;
+
+    // Save current graph state before navigating back
+    if (_currentSuperNode != null) {
+      // Save positions and connections of current nodes
+      _currentSuperNode!.clearChildren(); // Clear existing children
+      for (var node in nodes) {
+        node.$2.position = node.$1;
+        if (node.$2.type != 'parent') { // Don't save parent node
+          _currentSuperNode!.addChild(node.$2);
+          // Maintain connection with parent node for next visit
+          node.$2.addConnection(nodes[0].$2.id);
+          nodes[0].$2.addConnection(node.$2.id);
+        }
+      }
+    }
+
+    final previousState = _navigationStack.removeLast();
+    setState(() {
+      nodes = List<(Offset, NodeData)>.from(previousState.nodes);
+      connections = List<List<int>>.from(previousState.connections);
+      nodeTypes = nodes.map((node) => node.$2.type).toList();
+      _currentSuperNode = _navigationStack.isNotEmpty 
+          ? _navigationStack.last.superNode 
+          : null;
+    });
+
+    DraggableCanvas.navigationController.add(
+      _navigationStack.isNotEmpty 
+          ? _navigationStack.last.superNode.title 
+          : 'Main Graph'
+    );
+  }
+
   Widget _buildNode(int index,
       (Offset, NodeData) node) {
+    bool isParentNode =
+        _navigationStack.isNotEmpty &&
+            index == 0;
+
     return Positioned(
       left: (node.$1.dx * scale +
               canvasOffset.dx) -
@@ -569,7 +709,9 @@ class _DraggableCanvasState
                 null; // Clear selected edge when a node is clicked
           });
 
-          if (isEraserEnabled) {
+          // Remove parent node navigation from here
+          if (isEraserEnabled &&
+              !isParentNode) {
             _removeNode(index);
           } else {
             if (selectedNodeIndex ==
@@ -597,20 +739,32 @@ class _DraggableCanvasState
             }
           }
         },
+        onDoubleTap: () {
+          if (isParentNode) {
+            _navigateBack();
+          } else if (node.$2.type ==
+              'super-node') {
+            _navigateToSubGraph(
+                node.$2);
+          }
+        },
         onPanStart: (details) {
-          if (!isEraserEnabled) {
+          if (!isEraserEnabled &&
+              !isParentNode) {
             _startDragging(index,
                 details.localPosition);
           }
         },
         onPanUpdate: (details) {
-          if (!isEraserEnabled) {
+          if (!isEraserEnabled &&
+              !isParentNode) {
             _updateNodePosition(index,
                 details.localPosition);
           }
         },
         onPanEnd: (details) {
-          if (!isEraserEnabled) {
+          if (!isEraserEnabled &&
+              !isParentNode) {
             _stopDragging();
           }
         },
@@ -618,7 +772,9 @@ class _DraggableCanvasState
           width: 200,
           height: 75,
           child: InfoCard(
-            type: node.$2.type,
+            type: isParentNode
+                ? 'parent'
+                : node.$2.type,
             title: node.$2.title,
             description:
                 node.$2.description,
@@ -637,6 +793,19 @@ class _DraggableCanvasState
 
   Widget _buildEdgeContainer(int index,
       Offset start, Offset end) {
+    // Skip invalid connections
+    if (index >= connections.length ||
+        connections[index].length !=
+            2 ||
+        connections[index][0] >=
+            nodes.length ||
+        connections[index][1] >=
+            nodes.length ||
+        connections[index][0] < 0 ||
+        connections[index][1] < 0) {
+      return Container(); // Return empty container for invalid connections
+    }
+
     Offset midPoint = (start + end) / 2;
     double angle = atan2(
         end.dy - start.dy,
@@ -720,6 +889,13 @@ class _DraggableCanvasState
           mainAxisSize:
               MainAxisSize.min,
           children: [
+            if (_navigationStack
+                .isNotEmpty)
+              _buildIconButton(
+                Icons.arrow_back,
+                _navigateBack,
+                Colors.blue[200],
+              ),
             _buildIconButton(
               isPlaying
                   ? Icons.pause
@@ -787,16 +963,28 @@ class _DraggableCanvasState
             constraints.maxWidth,
             constraints.maxHeight);
         return Focus(
-          autofocus: true,
+          autofocus:
+              true, // This ensures the widget can receive keyboard events
           onKeyEvent: (node, event) {
-            if (event.logicalKey ==
-                    LogicalKeyboardKey
-                        .delete ||
-                event.logicalKey ==
-                    LogicalKeyboardKey
-                        .backspace) {
+            // Check if Delete or Backspace was pressed
+            if (event is KeyDownEvent &&
+                (event.logicalKey ==
+                        LogicalKeyboardKey
+                            .delete ||
+                    event.logicalKey ==
+                        LogicalKeyboardKey
+                            .backspace)) {
+              // Handle node deletion
               if (selectedNodeIndex !=
                   null) {
+                // Don't delete parent node
+                if (_navigationStack
+                        .isNotEmpty &&
+                    selectedNodeIndex ==
+                        0) {
+                  return KeyEventResult
+                      .handled;
+                }
                 _removeNode(
                     selectedNodeIndex!);
                 setState(() {
@@ -805,7 +993,9 @@ class _DraggableCanvasState
                 });
                 return KeyEventResult
                     .handled;
-              } else if (selectedConnection !=
+              }
+              // Handle connection deletion
+              else if (selectedConnection !=
                   null) {
                 _removeConnection(
                     selectedConnection!);
@@ -857,7 +1047,23 @@ class _DraggableCanvasState
                   ...connections
                       .asMap()
                       .entries
-                      .map((entry) {
+                      .where((entry) {
+                    final connection =
+                        entry.value;
+                    return connection
+                                .length ==
+                            2 &&
+                        connection[0] <
+                            nodes
+                                .length &&
+                        connection[1] <
+                            nodes
+                                .length &&
+                        connection[0] >=
+                            0 &&
+                        connection[1] >=
+                            0;
+                  }).map((entry) {
                     int index =
                         entry.key;
                     List<int>

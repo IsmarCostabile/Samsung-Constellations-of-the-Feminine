@@ -30,6 +30,7 @@ class _DataSectionState
   final _descriptionController =
       TextEditingController();
   List<String> _editedImages = [];
+  String _editedType = 'normal';
 
   @override
   void initState() {
@@ -155,6 +156,7 @@ class _DataSectionState
           node.description;
       _editedImages =
           List.from(node.images);
+      _editedType = node.type;
     });
   }
 
@@ -164,6 +166,7 @@ class _DataSectionState
       description:
           _descriptionController.text,
       images: _editedImages,
+      type: _editedType,
     );
     setState(() {
       _isEditing = false;
@@ -193,94 +196,155 @@ class _DataSectionState
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _isEditing
-                ? TextField(
-                    controller:
-                        _titleController,
-                    style:
-                        const TextStyle(
-                      fontSize: 32,
-                      fontWeight:
-                          FontWeight
-                              .w800,
-                      color: Color(
-                          0xFF14274E),
-                    ),
-                    decoration:
-                        InputDecoration(
-                      labelText:
-                          'Title',
-                      border:
-                          OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
+          Row(
+            children: [
+              Expanded(
+                child: _isEditing
+                    ? TextField(
+                        controller:
+                            _titleController,
+                        style:
+                            const TextStyle(
+                          fontSize: 32,
+                          fontWeight:
+                              FontWeight
+                                  .w800,
+                          color: Color(
+                              0xFF14274E),
+                        ),
+                        decoration:
+                            InputDecoration(
+                          labelText:
+                              'Title',
+                          border:
+                              OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(
                                     12),
-                        borderSide:
-                            BorderSide
-                                .none,
-                      ),
-                      filled: true,
-                      fillColor: Colors
-                          .grey[100],
-                      contentPadding:
-                          const EdgeInsets
-                              .all(16),
-                      labelStyle: TextStyle(
-                          color: Colors
-                                  .grey[
-                              700]),
-                      focusedBorder:
-                          OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
+                            borderSide:
+                                BorderSide
+                                    .none,
+                          ),
+                          filled: true,
+                          fillColor:
+                              Colors.grey[
+                                  100],
+                          contentPadding:
+                              const EdgeInsets
+                                  .all(
+                                  16),
+                          labelStyle: TextStyle(
+                              color: Colors
+                                      .grey[
+                                  700]),
+                          focusedBorder:
+                              OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(
                                     12),
-                        borderSide: BorderSide(
-                            color: Colors
-                                    .grey[
-                                700]!),
+                            borderSide:
+                                BorderSide(
+                                    color:
+                                        Colors.grey[700]!),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        node.title,
+                        style:
+                            const TextStyle(
+                          fontSize: 32,
+                          fontWeight:
+                              FontWeight
+                                  .w800,
+                          color: Color(
+                              0xFF14274E),
+                        ),
                       ),
-                    ),
-                  )
-                : Text(
-                    node.title,
-                    style:
-                        const TextStyle(
-                      fontSize: 32,
-                      fontWeight:
-                          FontWeight
-                              .w800,
-                      color: Color(
-                          0xFF14274E),
-                    ),
+              ),
+              _buildIconButton(
+                _isEditing
+                    ? Icons.save
+                    : Icons.edit,
+                () {
+                  if (_isEditing) {
+                    _saveChanges(node);
+                  } else {
+                    _startEditing(node);
+                  }
+                },
+                _isEditing
+                    ? Colors.green[200]
+                    : Colors.grey[200],
+              ),
+              if (_isEditing)
+                _buildIconButton(
+                  Icons.close,
+                  () => setState(() =>
+                      _isEditing =
+                          false),
+                  Colors.grey[200],
+                ),
+            ],
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius:
+                    BorderRadius
+                        .circular(12),
+                border: Border.all(
+                    color: Colors
+                        .grey[300]!),
+              ),
+              child:
+                  DropdownButtonFormField<
+                      String>(
+                value: _editedType,
+                decoration:
+                    InputDecoration(
+                  labelText:
+                      'Node Type',
+                  border:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius
+                            .circular(
+                                12),
+                    borderSide:
+                        BorderSide.none,
                   ),
-          ),
-          _buildIconButton(
-            _isEditing
-                ? Icons.save
-                : Icons.edit,
-            () {
-              if (_isEditing) {
-                _saveChanges(node);
-              } else {
-                _startEditing(node);
-              }
-            },
-            _isEditing
-                ? Colors.green[200]
-                : Colors.grey[200],
-          ),
-          if (_isEditing)
-            _buildIconButton(
-              Icons.close,
-              () => setState(() =>
-                  _isEditing = false),
-              Colors.grey[200],
+                  filled: true,
+                  fillColor:
+                      Colors.grey[100],
+                  contentPadding:
+                      const EdgeInsets
+                          .all(16),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                      value: 'normal',
+                      child: Text(
+                          'Normal')),
+                  DropdownMenuItem(
+                      value:
+                          'super-node',
+                      child: Text(
+                          'Super Node')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _editedType =
+                        value!;
+                  });
+                },
+              ),
             ),
+          ],
         ],
       ),
     );
@@ -677,6 +741,39 @@ class _DataSectionState
     );
   }
 
+  Widget _buildNavigationBreadcrumb() {
+    return StreamBuilder<String>(
+      stream: DraggableCanvas
+          .navigationController.stream,
+      initialData: 'Main Graph',
+      builder: (context, snapshot) {
+        return Container(
+          margin: const EdgeInsets.only(
+              bottom: 16),
+          padding: const EdgeInsets
+              .symmetric(
+              horizontal: 12,
+              vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius:
+                BorderRadius.circular(
+                    8),
+          ),
+          child: Text(
+            snapshot.data ??
+                'Main Graph',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight:
+                  FontWeight.w500,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -706,44 +803,57 @@ class _DataSectionState
               ),
             ],
           ),
-          child:
-              StreamBuilder<NodeData?>(
-            stream: DraggableCanvas
-                .selectedNodeController
-                .stream,
-            builder:
-                (context, snapshot) {
-              if (!snapshot.hasData) {
-                return _buildPlaceholderContainers();
-              }
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment
+                    .start,
+            children: [
+              _buildNavigationBreadcrumb(),
+              Expanded(
+                child: StreamBuilder<
+                    NodeData?>(
+                  stream: DraggableCanvas
+                      .selectedNodeController
+                      .stream,
+                  builder: (context,
+                      snapshot) {
+                    if (!snapshot
+                        .hasData) {
+                      return _buildPlaceholderContainers();
+                    }
 
-              final node =
-                  snapshot.data!;
-              if (node
-                  .images.isNotEmpty) {
-                _startImageTimer(
-                    node.images.length);
-              }
-              return SingleChildScrollView(
-                padding:
-                    const EdgeInsets
-                        .symmetric(
-                        vertical: 8),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                  children: [
-                    _buildTitleSection(
-                        node),
-                    _buildImageSection(
-                        node),
-                    _buildDescriptionSection(
-                        node),
-                  ],
+                    final node =
+                        snapshot.data!;
+                    if (node.images
+                        .isNotEmpty) {
+                      _startImageTimer(
+                          node.images
+                              .length);
+                    }
+                    return SingleChildScrollView(
+                      padding:
+                          const EdgeInsets
+                              .symmetric(
+                              vertical:
+                                  8),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                        children: [
+                          _buildTitleSection(
+                              node),
+                          _buildImageSection(
+                              node),
+                          _buildDescriptionSection(
+                              node),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
