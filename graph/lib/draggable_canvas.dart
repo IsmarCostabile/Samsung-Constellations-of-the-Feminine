@@ -15,10 +15,10 @@ class DraggableCanvas
   static final selectedNodeController =
       StreamController<
           NodeData?>.broadcast();
-  // Add navigation controller
+  // Update navigation controller to handle List<String> instead of String
   static final navigationController =
       StreamController<
-          String>.broadcast();
+          List<String>>.broadcast();
 
   const DraggableCanvas({super.key});
 
@@ -74,11 +74,35 @@ class _DraggableCanvasState
     super.dispose();
   }
 
+  // Add this method to get all nodes in the graph
+  List<NodeData> getAllNodes() {
+    Set<NodeData> allNodes = {};
+
+    // Add current level nodes
+    for (var node in nodes) {
+      allNodes.add(node.$2);
+    }
+
+    // Add nodes from navigation stack
+    for (var state
+        in _navigationStack) {
+      allNodes.add(state.superNode);
+      for (var node in state.nodes) {
+        allNodes.add(node.$2);
+      }
+    }
+
+    return allNodes.toList();
+  }
+
+  // Modify _showAddNodeDialog to pass existing nodes
   Future<void>
       _showAddNodeDialog() async {
     final nodeData =
         await showAddNodeDialog(
-            context);
+      context,
+      getAllNodes(),
+    );
     if (nodeData != null) {
       _addNode(
         Offset(canvasSize.width / 2,
@@ -588,105 +612,169 @@ class _DraggableCanvasState
     });
   }
 
-  void _navigateToSubGraph(NodeData superNode) {
-    if (superNode.type != 'super-node') return;
+  void _navigateToSubGraph(
+      NodeData superNode) {
+    if (superNode.type != 'super-node')
+      return;
 
     // Save current state to navigation stack
     if (_currentSuperNode != null) {
       // Update current super node's children before navigating
-      _currentSuperNode!.clearChildren(); // Clear existing children
-      for (var node in nodes.sublist(1)) { // Skip parent node
-        node.$2.position = node.$1; // Save position
-        _currentSuperNode!.addChild(node.$2);
+      _currentSuperNode!
+          .clearChildren(); // Clear existing children
+      for (var node
+          in nodes.sublist(1)) {
+        // Skip parent node
+        node.$2.position =
+            node.$1; // Save position
+        _currentSuperNode!
+            .addChild(node.$2);
       }
     }
 
     setState(() {
       _navigationStack.add((
         nodes: List.from(nodes),
-        connections: List.from(connections),
+        connections:
+            List.from(connections),
         superNode: superNode,
       ));
 
       // Create or reuse parent node
-      final parentNode = superNode.children.values
-          .where((n) => n.type == 'parent')
-          .firstOrNull ?? 
-        NodeData(
-          title: superNode.title,
-          description: 'Parent Node',
-          type: 'parent',
-          images: superNode.images,
-          parent: superNode,
-        );
+      final parentNode = superNode
+              .children.values
+              .where((n) =>
+                  n.type == 'parent')
+              .firstOrNull ??
+          NodeData(
+            title: superNode.title,
+            description: superNode
+                .description, // Use original description instead of "Parent Node"
+            type: 'parent',
+            images: superNode.images,
+            parent: superNode,
+          );
 
-      nodes = [(
-        Offset(canvasSize.width / 2, canvasSize.height / 2),
-        parentNode
-      )];
+      nodes = [
+        (
+          Offset(canvasSize.width / 2,
+              canvasSize.height / 2),
+          parentNode
+        )
+      ];
 
       // Add child nodes and maintain their connections with parent
-      nodes.addAll(
-        superNode.children.values
-          .where((node) => node.type != 'parent')
+      nodes.addAll(superNode
+          .children.values
+          .where((node) =>
+              node.type != 'parent')
           .map((child) {
-            // Create connection between parent and child
-            parentNode.addConnection(child.id);
-            child.addConnection(parentNode.id);
-            return (child.position, child);
-          })
-      );
+        // Create connection between parent and child
+        parentNode
+            .addConnection(child.id);
+        child.addConnection(
+            parentNode.id);
+        return (child.position, child);
+      }));
 
       // Rebuild all connections
       connections = [];
-      for (var i = 0; i < nodes.length; i++) {
-        for (var j = i + 1; j < nodes.length; j++) {
-          if (nodes[i].$2.hasConnection(nodes[j].$2.id)) {
+      for (var i = 0;
+          i < nodes.length;
+          i++) {
+        for (var j = i + 1;
+            j < nodes.length;
+            j++) {
+          if (nodes[i].$2.hasConnection(
+              nodes[j].$2.id)) {
             connections.add([i, j]);
           }
         }
       }
 
-      nodeTypes = nodes.map((node) => node.$2.type).toList();
+      nodeTypes = nodes
+          .map((node) => node.$2.type)
+          .toList();
       _currentSuperNode = superNode;
     });
 
-    DraggableCanvas.navigationController.add(superNode.title);
+    // Create path by getting all parent node titles
+    List<String> path = [
+      superNode.title
+    ];
+    NodeData? current =
+        superNode.parent;
+    while (current != null) {
+      path.insert(0, current.title);
+      current = current.parent;
+    }
+    path.insert(0, 'Main Graph');
+
+    DraggableCanvas.navigationController
+        .add(path);
   }
 
   void _navigateBack() {
-    if (_navigationStack.isEmpty) return;
+    if (_navigationStack.isEmpty)
+      return;
 
     // Save current graph state before navigating back
     if (_currentSuperNode != null) {
       // Save positions and connections of current nodes
-      _currentSuperNode!.clearChildren(); // Clear existing children
+      _currentSuperNode!
+          .clearChildren(); // Clear existing children
       for (var node in nodes) {
         node.$2.position = node.$1;
-        if (node.$2.type != 'parent') { // Don't save parent node
-          _currentSuperNode!.addChild(node.$2);
-          // Maintain connection with parent node for next visit
-          node.$2.addConnection(nodes[0].$2.id);
-          nodes[0].$2.addConnection(node.$2.id);
+        if (node.$2.type != 'parent') {
+          // Don't save parent node
+          _currentSuperNode!
+              .addChild(node.$2);
+          // Only maintain existing connections
+          if (_areNodesConnected(
+              0, nodes.indexOf(node))) {
+            node.$2.addConnection(
+                nodes[0].$2.id);
+            nodes[0].$2.addConnection(
+                node.$2.id);
+          }
         }
       }
     }
 
-    final previousState = _navigationStack.removeLast();
+    final previousState =
+        _navigationStack.removeLast();
     setState(() {
-      nodes = List<(Offset, NodeData)>.from(previousState.nodes);
-      connections = List<List<int>>.from(previousState.connections);
-      nodeTypes = nodes.map((node) => node.$2.type).toList();
-      _currentSuperNode = _navigationStack.isNotEmpty 
-          ? _navigationStack.last.superNode 
-          : null;
+      nodes =
+          List<(Offset, NodeData)>.from(
+              previousState.nodes);
+      connections =
+          List<List<int>>.from(
+              previousState
+                  .connections);
+      nodeTypes = nodes
+          .map((node) => node.$2.type)
+          .toList();
+      _currentSuperNode =
+          _navigationStack.isNotEmpty
+              ? _navigationStack
+                  .last.superNode
+              : null;
     });
 
-    DraggableCanvas.navigationController.add(
-      _navigationStack.isNotEmpty 
-          ? _navigationStack.last.superNode.title 
-          : 'Main Graph'
-    );
+    // Create path for previous level
+    List<String> path = ['Main Graph'];
+    if (_navigationStack.isNotEmpty) {
+      NodeData? current =
+          _navigationStack
+              .last.superNode;
+      while (current != null) {
+        path.add(current.title);
+        current = current.parent;
+      }
+    }
+
+    DraggableCanvas.navigationController
+        .add(path);
   }
 
   Widget _buildNode(int index,

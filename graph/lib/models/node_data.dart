@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 class NodeData {
   String id;
   String title;
   String description;
   List<String> images;
+  List<String> audioFiles;
+  List<String> documents;
+  List<String> videoLinks;
+  LatLng? coordinates;
   String type;
   NodeData? parent;
   Map<String, NodeData> children = {};
@@ -16,6 +21,10 @@ class NodeData {
     required this.title,
     required this.description,
     this.images = const [],
+    this.audioFiles = const [],
+    this.documents = const [],
+    this.videoLinks = const [],
+    this.coordinates,
     this.type = 'normal',
     this.parent,
     this.position = Offset.zero,
@@ -50,6 +59,10 @@ class NodeData {
       title: title,
       description: description,
       images: List.from(images),
+      audioFiles: List.from(audioFiles),
+      documents: List.from(documents),
+      videoLinks: List.from(videoLinks),
+      coordinates: coordinates,
       type: type,
       parent: parent,
       position: position,
@@ -62,12 +75,20 @@ class NodeData {
     String? title,
     String? description,
     List<String>? images,
+    List<String>? audioFiles,
+    List<String>? documents,
+    List<String>? videoLinks,
+    LatLng? coordinates,
     String? type,
     Offset? position,
   }) {
     if (title != null) this.title = title;
     if (description != null) this.description = description;
     if (images != null) this.images = List.from(images);
+    if (audioFiles != null) this.audioFiles = List.from(audioFiles);
+    if (documents != null) this.documents = List.from(documents);
+    if (videoLinks != null) this.videoLinks = List.from(videoLinks);
+    if (coordinates != null) this.coordinates = coordinates;
     if (type != null) {
       assert(type == 'normal' || type == 'super-node' || type == 'parent');
       this.type = type;

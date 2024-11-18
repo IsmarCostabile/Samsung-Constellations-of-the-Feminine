@@ -8,6 +8,10 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/node_data.dart';
 import 'draggable_canvas.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DataSection
     extends StatefulWidget {
@@ -31,6 +35,12 @@ class _DataSectionState
       TextEditingController();
   List<String> _editedImages = [];
   String _editedType = 'normal';
+  List<String> _editedAudioFiles = [];
+  List<String> _editedDocuments = [];
+  List<String> _editedVideoLinks = [];
+  LatLng? _editedCoordinates;
+  final _videoLinkController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -157,6 +167,14 @@ class _DataSectionState
       _editedImages =
           List.from(node.images);
       _editedType = node.type;
+      _editedAudioFiles =
+          List.from(node.audioFiles);
+      _editedDocuments =
+          List.from(node.documents);
+      _editedVideoLinks =
+          List.from(node.videoLinks);
+      _editedCoordinates =
+          node.coordinates;
     });
   }
 
@@ -167,6 +185,10 @@ class _DataSectionState
           _descriptionController.text,
       images: _editedImages,
       type: _editedType,
+      audioFiles: _editedAudioFiles,
+      documents: _editedDocuments,
+      videoLinks: _editedVideoLinks,
+      coordinates: _editedCoordinates,
     );
     setState(() {
       _isEditing = false;
@@ -352,10 +374,17 @@ class _DataSectionState
 
   Widget _buildDescriptionSection(
       NodeData node) {
+    if (!_isEditing &&
+        node.description.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       margin: const EdgeInsets.only(
           bottom: 24),
       padding: const EdgeInsets.all(20),
+      width: double
+          .infinity, // Ensures container takes full width
       decoration: BoxDecoration(
         color: Colors.grey[100],
         borderRadius:
@@ -413,12 +442,17 @@ class _DataSectionState
                 ),
               ),
             )
-          : Text(
-              node.description,
-              style: TextStyle(
-                fontSize: 20,
-                height: 1.5,
-                color: Colors.grey[900],
+          : Container(
+              width: double
+                  .infinity, // Ensures text container takes full width
+              child: Text(
+                node.description,
+                style: TextStyle(
+                  fontSize: 20,
+                  height: 1.5,
+                  color:
+                      Colors.grey[900],
+                ),
               ),
             ),
     );
@@ -721,6 +755,83 @@ class _DataSectionState
     );
   }
 
+  Widget _buildSectionHeader(
+      String title) {
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(
+              vertical: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[700],
+        ),
+      ),
+    );
+  }
+
+  Future<void>
+      _handleAudioUpload() async {
+    FilePickerResult? result =
+        await FilePicker.platform
+            .pickFiles(
+      type: FileType.audio,
+      allowMultiple: true,
+    );
+
+    if (result != null) {
+      for (var file in result.files) {
+        final bytes = file.bytes!;
+        final base64Audio =
+            base64Encode(bytes);
+        setState(() {
+          _editedAudioFiles.add(
+              'data:audio/mp3;base64,$base64Audio');
+        });
+      }
+    }
+  }
+
+  Future<void>
+      _handleDocumentUpload() async {
+    FilePickerResult? result =
+        await FilePicker.platform
+            .pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'pdf',
+        'doc',
+        'docx'
+      ],
+      allowMultiple: true,
+    );
+
+    if (result != null) {
+      for (var file in result.files) {
+        final bytes = file.bytes!;
+        final base64Doc =
+            base64Encode(bytes);
+        setState(() {
+          _editedDocuments.add(
+              'data:application/pdf;base64,$base64Doc');
+        });
+      }
+    }
+  }
+
+  void _addVideoLink() {
+    if (_videoLinkController
+        .text.isNotEmpty) {
+      setState(() {
+        _editedVideoLinks.add(
+            _videoLinkController.text);
+        _videoLinkController.clear();
+      });
+    }
+  }
+
   Widget _buildIconButton(IconData icon,
       VoidCallback onPressed,
       [Color? color]) {
@@ -742,35 +853,514 @@ class _DataSectionState
   }
 
   Widget _buildNavigationBreadcrumb() {
-    return StreamBuilder<String>(
+    return StreamBuilder<List<String>>(
       stream: DraggableCanvas
           .navigationController.stream,
-      initialData: 'Main Graph',
+      initialData: ['Home'],
       builder: (context, snapshot) {
+        final path =
+            snapshot.data ?? ['Home'];
         return Container(
           margin: const EdgeInsets.only(
               bottom: 16),
           padding: const EdgeInsets
-              .symmetric(
-              horizontal: 12,
-              vertical: 8),
+              .symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: Colors.grey[100],
             borderRadius:
                 BorderRadius.circular(
                     8),
           ),
-          child: Text(
-            snapshot.data ??
-                'Main Graph',
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontWeight:
-                  FontWeight.w500,
+          child: SingleChildScrollView(
+            scrollDirection:
+                Axis.horizontal,
+            child: Padding(
+              padding: const EdgeInsets
+                  .symmetric(
+                  horizontal: 12),
+              child: Row(
+                children: [
+                  for (int i = 0;
+                      i < path.length;
+                      i++) ...[
+                    if (i > 0)
+                      Padding(
+                        padding: const EdgeInsets
+                            .symmetric(
+                            horizontal:
+                                8),
+                        child: Icon(
+                            Icons
+                                .chevron_right,
+                            size: 16,
+                            color: Colors
+                                    .grey[
+                                700]),
+                      ),
+                    Text(
+                      path[i],
+                      style: TextStyle(
+                        color: Colors
+                            .grey[700],
+                        fontWeight: i ==
+                                path.length -
+                                    1
+                            ? FontWeight
+                                .bold
+                            : FontWeight
+                                .w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAudioFilesList(
+      List<String> audioFiles) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics:
+          const NeverScrollableScrollPhysics(),
+      itemCount: audioFiles.length,
+      itemBuilder: (context, index) {
+        return Card(
+          child: ListTile(
+            leading: const Icon(
+                Icons.audio_file),
+            title: Text(
+                'Audio File ${index + 1}'),
+            trailing: _isEditing
+                ? IconButton(
+                    icon: const Icon(
+                        Icons.delete),
+                    onPressed: () {
+                      setState(() {
+                        _editedAudioFiles
+                            .removeAt(
+                                index);
+                      });
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(
+                        Icons
+                            .play_arrow),
+                    onPressed: () {
+                      // Implement audio playback
+                    },
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDocumentsList(
+      List<String> documents) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics:
+          const NeverScrollableScrollPhysics(),
+      itemCount: documents.length,
+      itemBuilder: (context, index) {
+        return Card(
+          child: ListTile(
+            leading: const Icon(
+                Icons.description),
+            title: Text(
+                'Document ${index + 1}'),
+            trailing: _isEditing
+                ? IconButton(
+                    icon: const Icon(
+                        Icons.delete),
+                    onPressed: () {
+                      setState(() {
+                        _editedDocuments
+                            .removeAt(
+                                index);
+                      });
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(
+                        Icons.download),
+                    onPressed: () {
+                      // Implement document download
+                    },
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVideoLinksList(
+      List<String> videoLinks) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics:
+          const NeverScrollableScrollPhysics(),
+      itemCount: videoLinks.length,
+      itemBuilder: (context, index) {
+        return Card(
+          child: ListTile(
+            leading: const Icon(
+                Icons.video_library),
+            title:
+                Text(videoLinks[index]),
+            trailing: _isEditing
+                ? IconButton(
+                    icon: const Icon(
+                        Icons.delete),
+                    onPressed: () {
+                      setState(() {
+                        _editedVideoLinks
+                            .removeAt(
+                                index);
+                      });
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(Icons
+                        .open_in_new),
+                    onPressed:
+                        () async {
+                      final url =
+                          Uri.parse(
+                              videoLinks[
+                                  index]);
+                      if (await canLaunchUrl(
+                          url)) {
+                        await launchUrl(
+                            url);
+                      }
+                    },
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVideoLinkInput() {
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(
+              vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller:
+                  _videoLinkController,
+              decoration:
+                  InputDecoration(
+                labelText:
+                    'Add Video Link',
+                border:
+                    OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius
+                          .circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addVideoLink,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapSection(
+      LatLng? coordinates) {
+    if (coordinates == null &&
+        !_isEditing) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      height: 300,
+      child: FlutterMap(
+        options: MapOptions(
+          center: coordinates ??
+              LatLng(0, 0),
+          zoom: 13.0,
+          onTap: _isEditing
+              ? (tapPosition, point) {
+                  setState(() {
+                    _editedCoordinates =
+                        point;
+                  });
+                }
+              : null,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate:
+                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: const [
+              'a',
+              'b',
+              'c'
+            ],
+          ),
+          if (coordinates != null)
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: coordinates,
+                  builder: (ctx) =>
+                      const Icon(
+                    Icons.location_on,
+                    color: Colors.red,
+                    size: 30,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapControls() {
+    return Row(
+      mainAxisAlignment:
+          MainAxisAlignment.end,
+      children: [
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _editedCoordinates = null;
+            });
+          },
+          child: const Text(
+              'Clear Location'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAudioUploadButton() {
+    return ElevatedButton(
+      onPressed: _handleAudioUpload,
+      style: ElevatedButton.styleFrom(
+        backgroundColor:
+            const Color(0xFF14274E),
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(12),
+        ),
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 24,
+          vertical: 12,
+        ),
+      ),
+      child: const Text(
+        'Upload Audio',
+        style: TextStyle(
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentUploadButton() {
+    return ElevatedButton(
+      onPressed: _handleDocumentUpload,
+      style: ElevatedButton.styleFrom(
+        backgroundColor:
+            const Color(0xFF14274E),
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(12),
+        ),
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 24,
+          vertical: 12,
+        ),
+      ),
+      child: const Text(
+        'Upload Document',
+        style: TextStyle(
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioSection(
+      NodeData node) {
+    if (!_isEditing &&
+        node.audioFiles.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(
+          bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius:
+            BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+              'Audio Files'),
+          _buildAudioFilesList(
+              _isEditing
+                  ? _editedAudioFiles
+                  : node.audioFiles),
+          if (_isEditing)
+            _buildAudioUploadButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentsSection(
+      NodeData node) {
+    if (!_isEditing &&
+        node.documents.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(
+          bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius:
+            BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+              'Documents'),
+          _buildDocumentsList(_isEditing
+              ? _editedDocuments
+              : node.documents),
+          if (_isEditing)
+            _buildDocumentUploadButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoSection(
+      NodeData node) {
+    if (!_isEditing &&
+        node.videoLinks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(
+          bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius:
+            BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+              'Video Links'),
+          _buildVideoLinksList(
+              _isEditing
+                  ? _editedVideoLinks
+                  : node.videoLinks),
+          if (_isEditing)
+            _buildVideoLinkInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationSection(
+      NodeData node) {
+    if (!_isEditing &&
+        node.coordinates == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(
+          bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius:
+            BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+              'Location'),
+          _buildMapSection(_isEditing
+              ? _editedCoordinates
+              : node.coordinates),
+          if (_isEditing)
+            _buildMapControls(),
+        ],
+      ),
     );
   }
 
@@ -846,6 +1436,14 @@ class _DataSectionState
                           _buildImageSection(
                               node),
                           _buildDescriptionSection(
+                              node),
+                          _buildAudioSection(
+                              node),
+                          _buildDocumentsSection(
+                              node),
+                          _buildVideoSection(
+                              node),
+                          _buildLocationSection(
                               node),
                         ],
                       ),

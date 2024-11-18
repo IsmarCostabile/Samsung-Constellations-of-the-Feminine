@@ -166,7 +166,9 @@ class _InfoCardState
                   MainAxisSize.min,
               children: [
                 Text(
-                  widget.title,
+                  widget.type == 'super-node' 
+                      ? '✨ ${widget.title}'
+                      : widget.title,
                   style:
                       const TextStyle(
                     fontSize: 18,
